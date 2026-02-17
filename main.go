@@ -18,6 +18,7 @@ func init() {
 		"exit": handleExit,
 		"echo": handleEcho,
 		"pwd":  handlePwd,
+		"cd":   handleCd,
 	}
 }
 
@@ -90,5 +91,16 @@ func handlePwd(args []string) error {
 	}
 
 	fmt.Println(dir)
+	return nil
+}
+
+func handleCd(args []string) error {
+	directory := args[0]
+	directory = strings.ReplaceAll(args[0], "~", os.Getenv("HOME"))
+
+	err := os.Chdir(directory)
+	if err != nil {
+		fmt.Printf("cd: %s: No such file or directory\n", directory)
+	}
 	return nil
 }
