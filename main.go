@@ -17,6 +17,7 @@ func init() {
 		"type": handleType,
 		"exit": handleExit,
 		"echo": handleEcho,
+		"pwd":  handlePwd,
 	}
 }
 
@@ -79,5 +80,15 @@ func handleExit(args []string) error {
 
 func handleEcho(args []string) error {
 	fmt.Println(strings.Join(args, " "))
+	return nil
+}
+
+func handlePwd(args []string) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(dir)
 	return nil
 }
