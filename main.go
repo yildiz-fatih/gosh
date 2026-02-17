@@ -39,8 +39,16 @@ func main() {
 		if found {
 			cmdFunc(args)
 		} else {
-			fmt.Printf("%s: command not found\n", command)
-			continue
+			_, err := exec.LookPath(command)
+			if err != nil {
+				fmt.Printf("%s: command not found\n", command)
+				continue
+			}
+
+			cmd := exec.Command(command, args...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Run()
 		}
 	}
 }
