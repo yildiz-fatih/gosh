@@ -15,6 +15,7 @@ var builtins map[string]Command
 func init() {
 	builtins = map[string]Command{
 		"type": handleType,
+		"exit": handleExit,
 	}
 }
 
@@ -67,5 +68,10 @@ func handleType(args []string) error {
 
 		fmt.Printf("%s is %s\n", cmd, filePath)
 	}
+	return nil
+}
+
+func handleExit(args []string) error {
+	os.Exit(0)
 	return nil
 }
