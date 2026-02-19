@@ -31,7 +31,7 @@ func main() {
 		scanner.Scan()
 		input := scanner.Text()
 
-		words := strings.Fields(input)
+		words := parseInput(input)
 		if len(words) == 0 {
 			continue
 		}
@@ -56,6 +56,85 @@ func main() {
 			cmd.Run()
 		}
 	}
+}
+
+func parseInput(input string) []string {
+	words := []string{}         // Stores the parsed words
+	inSingleQuotes := false     // Tracks if we are inside single quotes
+	inDoubleQuotes := false     // Tracks if we are inside double quotes
+	var builder strings.Builder // Builds the current word
+
+	runes := []rune(input)
+
+	// Iterate through each rune in the input string
+	for i := 0; i < len(runes); i++ {
+		currentRune := runes[i]
+
+		// Single Quotes mode
+		if inSingleQuotes {
+			if currentRune == '\'' { // End of single quotes
+				inSingleQuotes = false
+				continue
+			}
+
+			// Any other rune is treated literally
+			builder.WriteRune(currentRune)
+			continue
+		}
+
+		// Double Quotes mode
+		if inDoubleQuotes {
+			if currentRune == '"' { // End of double quotes
+				inDoubleQuotes = false
+				continue
+			}
+
+			// In double quotes, backslash only escapes certain runes
+			if currentRune == '\\' && (i+1 < len(runes)) { // Ensure the next rune is not out of bounds
+				nextRune := runes[i+1]
+				if nextRune == '\\' || nextRune == '"' || nextRune == '$' || nextRune == '\n' {
+					builder.WriteRune(nextRune) // Add the next rune to the word
+					i++                         // Skip the next rune
+					continue
+				}
+			}
+
+			// Any other rune is treated literally
+			builder.WriteRune(currentRune)
+			continue
+		}
+
+		// Unquoted (normal) mode
+		switch currentRune {
+		case '\'': // Start of single quotes
+			inSingleQuotes = true
+			continue
+		case '"': // Start of double quotes
+			inDoubleQuotes = true
+			continue
+		case ' ', '\t': // Whitespace separates words
+			if builder.Len() > 0 { // Check if there are runes in the builder
+				words = append(words, builder.String()) // Add the current word to the list of parsed words
+				builder.Reset()                         // Clear the builder for the next word
+			}
+			continue
+		case '\\': // Backslash escapes the next rune
+			if i+1 < len(runes) { // Ensure the next rune is not out of bounds
+				builder.WriteRune(runes[i+1]) // Add the next rune to the word
+				i++                           // Skip the next rune
+			}
+			continue
+		default: // Any other rune is added to the current word
+			builder.WriteRune(currentRune)
+		}
+	}
+
+	// Add the last word if there are any runes left in the builder
+	if builder.Len() > 0 {
+		words = append(words, builder.String())
+	}
+
+	return words
 }
 
 func handleType(args []string) error {
