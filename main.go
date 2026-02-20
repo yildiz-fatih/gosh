@@ -26,36 +26,23 @@ func main() {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
-		fmt.Printf("$ ")
-
-		scanner.Scan()
-		input := scanner.Text()
+		input := readInput(scanner)
 
 		words := parseInput(input)
 		if len(words) == 0 {
 			continue
 		}
 
-		command := words[0]
-		args := words[1:]
-
-		cmdFunc, found := builtins[command]
-		if found {
-			cmdFunc(args)
-		} else {
-			_, err := exec.LookPath(command)
-			if err != nil {
-				fmt.Printf("%s: command not found\n", command)
-				continue
-			}
-
-			cmd := exec.Command(command, args...)
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Run()
-		}
+		evalCommand(words)
 	}
+}
+
+func readInput(scanner *bufio.Scanner) string {
+	fmt.Printf("$ ")
+
+	scanner.Scan()
+	input := scanner.Text()
+	return input
 }
 
 func parseInput(input string) []string {
@@ -135,6 +122,28 @@ func parseInput(input string) []string {
 	}
 
 	return words
+}
+
+func evalCommand(words []string) {
+	command := words[0]
+	args := words[1:]
+
+	cmdFunc, found := builtins[command]
+	if found {
+		cmdFunc(args)
+	} else {
+		_, err := exec.LookPath(command)
+		if err != nil {
+			fmt.Printf("%s: command not found\n", command)
+			return
+		}
+
+		cmd := exec.Command(command, args...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Run()
+	}
 }
 
 func handleType(args []string) error {
