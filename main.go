@@ -128,21 +128,36 @@ func parseInput(input string) []string {
 func evalCommand(words []string) {
 	command := words[0]
 	args := words[1:]
-	redirectStdout := false
-	redirectStderr := false
+	type RedirectDst int
+	const (
+		RedirectNone RedirectDst = iota
+		RedirectStdout
+		RedirectStderr
+	)
+	var redirDst RedirectDst = RedirectNone
 	var filename string
-	var destination io.Writer = os.Stdout
+	var outputDestination io.Writer = os.Stdout
 	var errDestination io.Writer = os.Stderr
+	var openFlag int
 
 	// Check for output redirection
 	for i, word := range words {
-		if word == "1>" || word == ">" {
-			redirectStdout = true
-			args = words[1:i]
-			filename = words[i+1]
-			break
-		} else if word == "2>" {
-			redirectStderr = true
+		switch word {
+		case "1>", ">":
+			redirDst = RedirectStdout
+			openFlag = os.O_TRUNC
+		case "2>":
+			redirDst = RedirectStderr
+			openFlag = os.O_TRUNC
+		case ">>", "1>>":
+			redirDst = RedirectStdout
+			openFlag = os.O_APPEND
+		case "2>>":
+			redirDst = RedirectStderr
+			openFlag = os.O_APPEND
+		}
+
+		if redirDst != RedirectNone {
 			args = words[1:i]
 			filename = words[i+1]
 			break
@@ -151,21 +166,21 @@ func evalCommand(words []string) {
 
 	// Handle output redirection
 	var dstFile *os.File
-	if redirectStdout {
-		dstFile, _ = os.Create(filename)
+	if redirDst != RedirectNone {
+		dstFile, _ = os.OpenFile(filename, openFlag|os.O_CREATE|os.O_WRONLY, 0644)
 		defer dstFile.Close()
-		destination = dstFile
-	}
 
-	if redirectStderr {
-		dstFile, _ = os.Create(filename)
-		defer dstFile.Close()
-		errDestination = dstFile
+		switch redirDst {
+		case RedirectStdout:
+			outputDestination = dstFile
+		case RedirectStderr:
+			errDestination = dstFile
+		}
 	}
 
 	cmdFunc, found := builtins[command]
 	if found {
-		cmdFunc(args, destination, errDestination)
+		cmdFunc(args, outputDestination, errDestination)
 	} else {
 		_, err := exec.LookPath(command)
 		if err != nil {
@@ -175,7 +190,7 @@ func evalCommand(words []string) {
 
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = os.Stdin
-		cmd.Stdout = destination
+		cmd.Stdout = outputDestination
 		cmd.Stderr = errDestination
 		cmd.Run()
 	}
