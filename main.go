@@ -3,12 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-type Command func(args []string) error
+type Command func(args []string, dst io.Writer) error
 
 var builtins map[string]Command
 
@@ -127,69 +128,90 @@ func parseInput(input string) []string {
 func evalCommand(words []string) {
 	command := words[0]
 	args := words[1:]
+	redirect := false
+	var filename string
+	var destination io.Writer = os.Stdout
+
+	// Check for output redirection
+	for i, word := range words {
+		if word == "1>" || word == ">" {
+			redirect = true
+			args = words[1:i]
+			filename = words[i+1]
+			break
+		}
+	}
+
+	// Handle output redirection
+	var dstFile *os.File
+	if redirect {
+		dstFile, _ = os.Create(filename)
+		defer dstFile.Close()
+		destination = dstFile
+	}
 
 	cmdFunc, found := builtins[command]
 	if found {
-		cmdFunc(args)
+		cmdFunc(args, destination)
 	} else {
 		_, err := exec.LookPath(command)
 		if err != nil {
-			fmt.Printf("%s: command not found\n", command)
+			fmt.Fprintf(os.Stderr, "%s: command not found\n", command)
 			return
 		}
 
 		cmd := exec.Command(command, args...)
 		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
+		cmd.Stdout = destination
 		cmd.Stderr = os.Stderr
 		cmd.Run()
 	}
 }
 
-func handleType(args []string) error {
+func handleType(args []string, dst io.Writer) error {
 	cmd := args[0]
 	_, found := builtins[cmd]
 	if found {
-		fmt.Printf("%s is a shell builtin\n", cmd)
+		fmt.Fprintf(dst, "%s is a shell builtin\n", cmd)
 	} else {
 		filePath, err := exec.LookPath(cmd)
 		if err != nil {
-			fmt.Printf("%s: not found\n", cmd)
+			fmt.Fprintf(dst, "%s: not found\n", cmd)
 			return nil
 		}
 
-		fmt.Printf("%s is %s\n", cmd, filePath)
+		fmt.Fprintf(dst, "%s is %s\n", cmd, filePath)
 	}
 	return nil
 }
 
-func handleExit(args []string) error {
+func handleExit(args []string, dst io.Writer) error {
 	os.Exit(0)
 	return nil
 }
 
-func handleEcho(args []string) error {
-	fmt.Println(strings.Join(args, " "))
+func handleEcho(args []string, dst io.Writer) error {
+	fmt.Fprintln(dst, strings.Join(args, " "))
 	return nil
 }
 
-func handlePwd(args []string) error {
+func handlePwd(args []string, dst io.Writer) error {
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(dir)
+	fmt.Fprintln(dst, dir)
 	return nil
 }
 
-func handleCd(args []string) error {
+func handleCd(args []string, dst io.Writer) error {
 	directory := args[0]
 	directory = strings.ReplaceAll(args[0], "~", os.Getenv("HOME"))
 
 	err := os.Chdir(directory)
 	if err != nil {
-		fmt.Printf("cd: %s: No such file or directory\n", directory)
+		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", directory)
 	}
 	return nil
 }
